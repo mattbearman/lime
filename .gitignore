@@ -13,8 +13,6 @@ httpdocs/*
 includes/*
 !.gitignore
 
-.git.old
-
 # Aptana Files #
 ################
 .project
