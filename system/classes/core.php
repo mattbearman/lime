@@ -7,6 +7,8 @@ namespace Lime;
  */
 class Core {
 	
+	public $version = '0.1';
+	
 	protected $base_url;
 	protected $language;
 	protected $dry_run = true;
