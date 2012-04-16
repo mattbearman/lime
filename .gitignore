@@ -5,9 +5,10 @@
 pages/*
 !.gitignore
 
-# Same deal for httpdocs
+# Same deal for httpdocs, only we need to keep the front accessor
 httpdocs/*
 !.gitignore
+!lime.php
 
 # And includes
 includes/*
