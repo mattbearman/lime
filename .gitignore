@@ -1,6 +1,19 @@
 # Project Specific Files #
 ##########################
 
+# Ignore anything in pages, but keep the empty dir
+pages/*
+!.gitignore
+
+# Same deal for httpdocs, only we need to keep the front accessor
+httpdocs/*
+!.gitignore
+!lime.php
+
+# And includes
+includes/*
+!.gitignore
+
 # Aptana Files #
 ################
 .project

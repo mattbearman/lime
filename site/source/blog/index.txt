@@ -1,0 +1,7 @@
+#Blog Posts#
+
+This is a listing page for all the blog entries. 
+
+The name-matched template /site/templates/blog/index.php is used, this template uses the siblings() method to get a list of all the pages in the blog/ directory, excluding the current file.
+
+##Entries:##
