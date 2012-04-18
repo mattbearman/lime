@@ -1,9 +1,0 @@
-#This is a blog post#
-
-This page also uses the /site/templates/_default.php template, as default templates are inherited through sub-directories. 
-
-As the blog subdirectory doesn't have a _default template of its own, the _default template from the directory above used. 
-
-##Entry dates##
-
-Notice how this filename includes a date (2012-04-18) - Dates in this format are automatically extracted fromt the beginning of a file name, and made available through the page's date property.

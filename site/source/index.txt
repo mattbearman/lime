@@ -1,5 +1,4 @@
-#Welcome to the LiME Demo Site#
+#Drunken Ramblings of a Sober Man#
 
-This is the main home page, it is rendered using the template /site/templates/_default.php, if there was a template called index.php, this would be used instead, as the _default template is a fallback for when a page specific template does not exist.
+A weblog about what ever happens to cross my mind.
 
-You can see this in action on the [About](/about.html) page, as it uses the name-matched template /site/templates/about.php. 

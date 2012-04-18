@@ -1,3 +1,0 @@
-#About!#
-
-This is another page that uses a the about.php template, which overrides the _default.php template
