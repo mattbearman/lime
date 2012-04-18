@@ -7,7 +7,7 @@ namespace Lime;
  */
 class Core {
 	
-	private $version = '0.1';
+	private $version = '0.2';
 	
 	private $lime_path;
 	private $site_path;
@@ -57,7 +57,6 @@ class Core {
 		
 		// load the page class and markdown classes
 		require_once $this->lime_path.'system/classes/page.php';
-		require_once $this->lime_path.'system/classes/directory.php';
 		require_once $this->lime_path.'system/classes/markdown.php';
 		
 		// load the language
