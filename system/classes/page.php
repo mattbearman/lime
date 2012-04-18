@@ -5,7 +5,9 @@ namespace Lime;
 /**
  * Lime page class
  */
-class Page extends Core {
+class Page {
+	
+	private $core;
 	
 	private $uri;
 	private $file_name;
@@ -25,7 +27,10 @@ class Page extends Core {
 	 * @param string $uri
 	 * @param string $default_template
 	 */
-	public function __construct($uri, $defalt_template=false, $settings=false) {
+	public function __construct($core, $uri, $defalt_template=false) {
+		
+		// set reference to core object
+		$this->core = &$core;
 		
 		$this->uri = trim($uri, '/');
 		
@@ -50,51 +55,44 @@ class Page extends Core {
 		// create title from file name
 		$this->title = ucwords(str_replace('-', ' ', $this->title));
 		
-		// load settings from core
-		foreach($settings as $name=>&$value) {
-			$this->$name = &$value;
-		}
-		
-		//echo $this->folder.$this->file_name.'<br>';
-		
 		// create the link to this page
-		$this->link = $this->page_link($this->folder.$this->file_name);
+		$this->link = $this->url($this->folder.$this->file_name);
 		
 		// load content
 		$this->load_content();
 	}
 	
+	/**
+	 * Load the content and process the markdown into HTML
+	 */
 	public function load_content() {
 		
 		// if path is a directory, laad the default (index) file
-		$file_path = LIME_PAGES_PATH.$this->uri;
-		
-		if(is_dir($file_path)) {
-			$file_path.='/index';
-		}
-		
-		// is there a page specific template
-		$page_template_path = $file_path.'.php'; 
-		
-		if(file_exists($page_template_path)) {
-			$this->template = $this->uri.'.php';
-		}
-		
-		$file_path.='.txt';
+		$file_path = $this->core->source_path.$this->uri.'.txt';
 		
 		if(file_exists($file_path)) {
 			$this->content = Markdown(file_get_contents($file_path));
 		}
 	}
 	
+	/**
+	 * Render the html into the template
+	 */
 	public function render() {
 		
 		// has this page already been rendered?
 		if(!$this->html) {
 		
+			// is there a page specific template
+			$page_template_path = $this->core->template_path.$this->uri.'.php'; 
+			
+			if(file_exists($page_template_path)) {
+				$this->template = $this->uri.'.php';
+			}
+		
 			ob_start();
 			
-			require LIME_PAGES_PATH.$this->template;
+			require $this->core->template_path.$this->template;
 			
 			$this->html = ob_get_clean();
 		}
@@ -104,9 +102,9 @@ class Page extends Core {
 	
 	public function make_file() {
 		
-		$folder_path = LIME_WEBROOT_PATH.$this->folder;
+		$folder_path = $this->core->webroot_path.$this->folder;
 		$file_name = $this->folder.$this->file_name.'.html';
-		$file_path = LIME_WEBROOT_PATH.$file_name;
+		$file_path = $this->core->webroot_path.$file_name;
 		
 		// write file flag
 		$write_file = false;
@@ -114,9 +112,9 @@ class Page extends Core {
 		// first check to see if the folder exists
 		if(!is_dir($folder_path)) {
 			// folder doesn't exist, so we need to create it
-			$this->log('create', sprintf($this->language->create_directory, $this->folder));
+			$this->core->log('create', sprintf($this->core->language->create_directory, $this->folder));
 			
-			if(!$this->dry_run) {
+			if(!$this->core->dry_run) {
 				mkdir($folder_path);
 			}
 		}
@@ -124,22 +122,22 @@ class Page extends Core {
 		// does the file exist
 		if(!file_exists($file_path)) {
 			// file doesn't exist, so we need to create it
-			$this->log('create', sprintf($this->language->create_file, $file_name));
-			
+			$this->core->log('create', sprintf($this->core->language->create_file, $file_name));
+
 			$write_file = true;
 		}
 		
 		// see if the file has changed
 		else {
 			if($this->html != file_get_contents($file_path)) {
-				$this->log('update', sprintf($this->language->update_file, $file_name));
+				$this->core->log('update', sprintf($this->core->language->update_file, $file_name));
 			
 				$write_file = true;
 			}
 		}
 		
 		// should we write the file?
-		if(!$this->dry_run && $write_file) {
+		if(!$this->core->dry_run && $write_file) {
 			$file_handle = fopen($file_path, 'w');
 			fwrite($file_handle, $this->html);
 			fclose($file_handle);
@@ -155,20 +153,20 @@ class Page extends Core {
 		$this->siblings = array();
 		
 		// load the siblings
-		$files = scandir(LIME_PAGES_PATH.$this->folder);
+		$files = scandir($this->core->source_path.$this->folder);
 		
-		$files = $this->filter_hidden_files($files);
+		$files = $this->core->filter_hidden_files($files);
 		
-		$pages = $this->filter_pages($files);
+		$pages = $this->core->filter_pages($files);
 		
 		foreach($pages as $page) {
 			
 			// don't include self in list of siblings
 			if($page != $this->file_name) {
-				$this->siblings[] = &$this->create_page($uri=$this->folder.$page, false);
+				$this->siblings[] = &$this->core->create_page($uri=$this->folder.$page, false);
 			}
 		}
-
+		
 		return $this->siblings;
 	}
 	
@@ -194,7 +192,7 @@ class Page extends Core {
 	 * See if the passed in url matches this page's url, allow for leading/trailng slashes and index removal
 	 */
 	public function compare_uri($uri) {
-		
+
 		$uri = trim($uri, '/');
 		
 		if($uri == $this->uri) {
@@ -209,6 +207,66 @@ class Page extends Core {
 	
 	public function __tostring() {
 		return $this->uri;
+	}
+	
+	/**
+	 * Get a link, if $page is not specified then use the current page
+	 * 
+	 * @param string $page
+	 */
+	protected function url($page=false) {
+		
+		if(!$page) {
+			$page = $this->uri;
+		}
+		
+		// remove leading and trailing slashes
+		$page = trim($page, '/');
+		
+		// if this link has already been resolved, get it from cache
+		if(isset($this->core->links[$page])) {
+			return $this->core->links[$page];
+		}
+
+		// path to the associated page text file
+		$page_file = $this->core->source_path.$page;
+		
+		// set up url to page by starting with base url
+		$page_url = $this->core->base_url;
+		
+		// if previewing, use the preview url
+		if($this->core->preview) {
+			$page_url .= $this->core->accessor.'?preview='.$page;
+		}
+		
+		else {
+			
+			// is it a folder?
+			if(is_dir($this->core->source_path.$page)) {
+				$page_file .= '/index.txt';
+				
+				$page_url .= $page;
+			}
+			
+			else {
+				$page_file .= '.txt';
+			
+				$page_url .= $page.($this->core->rewrite ? '' : '.html');
+			}
+			
+		}
+			
+		// is it a 404?
+		if(!file_exists($page_file)) {
+			$debug = debug_backtrace();
+			
+			$this->core->log('error', sprintf($this->core->language->broken_link, $debug[0]['file'], $page, $debug[0]['line']));
+		}
+		
+		// cache this link to save further processing
+		$this->core->cache_link($page, $page_url);
+		
+		return $page_url;
 	}
 	
 	public function __get($name) {

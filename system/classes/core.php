@@ -7,77 +7,119 @@ namespace Lime;
  */
 class Core {
 	
-	public $version = '0.1';
+	private $version = '0.1';
 	
-	protected $base_url;
-	protected $language;
-	protected $dry_run = true;
-	protected $preview = false;
-	protected $rewrite = false;
-	protected $links = array();
-	protected $log = array();
+	private $lime_path;
+	private $site_path;
+	private $webroot_path;
+	private $source_path;
+	private $template_path;
 	
-	public function __construct() {
+	private $accessor;
+	
+	private $base_url;
+	private $language;
+	private $dry_run = true;
+	private $preview = false;
+	private $rewrite = false;
+	private $links = array();
+	private $log = array();
+	
+	/**
+	 * Constructor - optionally pass in hte path back to the lime root directory from the front accessor file, this is usually ../../
+	 * 
+	 * @param string $relative_path
+	 */
+	public function __construct($relative_path='../../') {
 		
-		if($_SERVER['SERVER_ADDR'] == '127.0.0.1') {
+		// if the user and server are on the same IP, chances are it's a local development test, so show errors
+		if($_SERVER['SERVER_ADDR'] == $_SERVER['REMOTE_ADDR']) {
 			ini_set('display_errors', 1);
 			error_reporting(E_ALL);
 		}
+		
+		// set the absolute path to the lime root directory
+		$this->lime_path = $_SERVER['DOCUMENT_ROOT'].'/'.$relative_path;
+		
+		// save the name of the front accessor
+		$this->accessor = trim($_SERVER['SCRIPT_NAME'], '/');
+		
+		// set path to webroot, source and includes
+		$this->site_path = $this->lime_path.'site/';
+		$this->webroot_path = $this->site_path.'webroot/';
+		$this->source_path = $this->site_path.'source/';
+		$this->template_path = $this->site_path.'templates/';
 		
 		// figure out the base url
 		$this->base_url = isset($_SERVER['HTTPS']) && strtolower($_SERVER['HTTPS']) !== 'off' ? 'https' : 'http';
 		$this->base_url .= '://'. $_SERVER['HTTP_HOST'];
 		$this->base_url .= str_replace(basename($_SERVER['SCRIPT_NAME']), '', $_SERVER['SCRIPT_NAME']);
 		
-		// set some constants
-		define('LIME_PAGES_PATH',  LIME_PATH.'pages/');
-		define('LIME_WEBROOT_PATH',  LIME_PATH.'httpdocs/');
-		
 		// load the page class and markdown classes
-		require_once LIME_PATH.'system/classes/page.php';
-		require_once LIME_PATH.'system/classes/markdown.php';
+		require_once $this->lime_path.'system/classes/page.php';
+		require_once $this->lime_path.'system/classes/directory.php';
+		require_once $this->lime_path.'system/classes/markdown.php';
 		
 		// load the language
-		require_once LIME_PATH.'system/language/en.php';
+		// @todo: allow other languages than english
+		require_once $this->lime_path.'system/language/en.php';
 		
 		$this->language = new Language;
+		
+		$this->start_complier();
+	}
+
+	/**
+	 * Fire up the LiME Compiler
+	 */
+	private function start_complier() {
+		
+		// if preview is set, preview that page
+		if(isset($_GET['preview'])) {
+			$this->preview($_GET['preview']);
+		}
+		
+		// publish the pages, first pass is a dry run, pages are only actually published if $_POST['make_files'] is set
+		else {
+			$this->publish($dry_run = !isset($_POST['make_files']));
+		}
 	}
 	
 	/**
-	 * Crawl from the $folder either creating html files, or looking for a target file
+	 * Crawl from the $start_directory either creating html files, or looking for a target file
 	 */
-	private function crawl($folder='/', $defalt_template=false, $target=false) {
+	private function crawl($start_directory='/', $defalt_template=false, $target=false) {
 		
 		// load the default template for this folder (if there is one)
-		if(file_exists(LIME_PAGES_PATH.$folder.'_default.php')) {
-			$defalt_template = $folder.'_default.php';
+		if(file_exists($this->template_path.$start_directory.'_default.php')) {
+			$defalt_template = $start_directory.'_default.php';
 		}
 		
 		// get all fiels in this folder
-		$files = scandir(LIME_PAGES_PATH.$folder);
+		$files = scandir($this->source_path.$start_directory);
 		
 		// remove hidden files from list
 		$files = $this->filter_hidden_files($files);
 		
 		// get pages (.txt files)
 		$pages = $this->filter_pages($files);
-
+		
 		// process sub folders first
 		foreach($files as $file) {
 			
 			// path to the file
-			$file_path = LIME_PAGES_PATH.$folder.$file;
+			$file_path = $this->source_path.$start_directory.$file;
 				
 			// is it a folder
 			if(is_dir($file_path)) {
-				$this->crawl($folder.$file.'/', $defalt_template, $target);
+				$this->crawl($start_directory.$file.'/', $defalt_template, $target);
 			}
 		}
 		
 		// now proces the page files		
 		foreach($pages as $file_name) {
 			
-			$page = &$this->create_page($uri=$folder.$file_name, $defalt_template);
+			$page = &$this->create_page($uri=$start_directory.$file_name, $defalt_template);
 			
 			$page->render();
 			
@@ -99,9 +141,9 @@ class Core {
 	 * 
 	 * @return bool $folder_now_empty
 	 */
-	public function remove_unused_files($folder='') {
+	private function remove_unused_files($folder='') {
 		
-		$path = LIME_WEBROOT_PATH.$folder;
+		$path = $this->webroot_path.$folder;
 		
 		// traverse httpdocs and remove files that don't have matching pages files
 		$httpdocs = scandir($path);
@@ -114,13 +156,16 @@ class Core {
 		foreach($httpdocs as $file) {
 			// is it a directory
 			if(is_dir($folder.$file)) {
+				
+				// remove_unused_files only returns true if the directory will be empty after file deletion.
+				// only remove directory if it is empty (returned true)
 				if($this->remove_unused_files($folder.$file.'/')) {
 					// should the directory be removed?
-					if(!is_dir(LIME_PAGES_PATH.$folder.$file)) {
+					if(!is_dir($this->source_path.$folder.$file)) {
 						$this->log('delete', sprintf($this->language->delete_directory, $folder.$file.'/'));
 						
 						if(!$this->dry_run) {
-							rmdir(LIME_WEBROOT_PATH.$folder.$file);
+							rmdir($this->webroot_path.$folder.$file);
 						}
 					}
 				}
@@ -131,12 +176,12 @@ class Core {
 					// remove the .html and replace with .txt
 					$text_file = str_ireplace('.html', '.txt', $file);
 					
-					if(!file_exists(LIME_PAGES_PATH.$folder.$text_file)) {
+					if(!file_exists($this->source_path.$folder.$text_file)) {
 						$this->log('delete', sprintf($this->language->delete_file, $folder.$file));
 						$delete_count++;
 						
 						if(!$this->dry_run) {
-							unlink(LIME_WEBROOT_PATH.$folder.$file);
+							unlink($this->webroot_path.$folder.$file);
 						}
 					}
 				}
@@ -149,7 +194,7 @@ class Core {
 	/**
 	 * Preview a page
 	 */
-	public function preview($uri) {
+	private function preview($uri) {
 		
 		// set the preview flag
 		$this->preview = true;
@@ -160,7 +205,7 @@ class Core {
 	/**
 	 * Publish pages
 	 */
-	public function publish($dry_run=true) {
+	private function publish($dry_run=true) {
 		
 		$this->dry_run = $dry_run;
 		
@@ -169,14 +214,30 @@ class Core {
 		$this->remove_unused_files();
 		
 		if($dry_run) {
-			require LIME_PATH.'system/views/publish.php';
+			require $this->lime_path.'system/views/publish.php';
 		}
+	}
+	
+	/**
+	 * Page factory function
+	 */
+	public function create_page($uri, $defalt_template) {
+		$page = new Page($this, $uri, $defalt_template);
+		
+		return $page;
+	}
+	
+	/**
+	 * Cache a page link
+	 */
+	public function cache_link($name, $url) {
+		$this->links[$name] = $url;
 	}
 	
 	/**
 	 * Log a message
 	 */
-	protected function log($type, $message) {
+	public function log($type, $message) {
 		// suppress duplicate messages	
 		if(!@in_array($message, $this->log[$type])) {
 			$this->log[$type][] = $message;
@@ -184,26 +245,9 @@ class Core {
 	}
 	
 	/**
-	 * Page factory function
-	 */
-	protected function create_page($uri, $defalt_template) {
-		$page = new Page($uri, $defalt_template, array(
-			'base_url'=>&$this->base_url,
-			'preview'=>&$this->preview,
-			'dry_run'=>&$this->dry_run,
-			'rewrite'=>&$this->rewrite,
-			'language'=>&$this->language,
-			'links'=>&$this->links,
-			'log'=>&$this->log
-		));
-		
-		return $page;
-	}
-	
-	/**
 	 * Filter live pages from a list of files/folders
 	 */
-	protected function filter_pages($files) {
+	public function filter_pages($files) {
 		
 		$pages = array();
 		
@@ -228,7 +272,7 @@ class Core {
 	/**
 	 * Remove any files/folders that are hidden (start with . or _)
 	 */
-	protected function filter_hidden_files($files) {
+	public function filter_hidden_files($files) {
 		
 		$filtered = array();
 		
@@ -243,55 +287,10 @@ class Core {
 		return $filtered;
 	}
 	
-	protected function page_link($page) {
-		
-		$page = trim($page, '/');
-		
-		// if this link has already been resolved, get it from cache
-		if(isset($this->links[$page])) {
-			return $this->links[$page];
-		}
-
-		// path to the associated page text file
-		$page_file = LIME_PAGES_PATH.$page;
-		
-		$page_url = $this->base_url;
-		
-		if($this->preview) {
-			$page_url .= 'lime.php?preview='.$page;
-		}
-		
-		else {
-			
-			// is it a folder?
-			if(is_dir(LIME_PAGES_PATH.$page)) {
-				$page_file .= '/index.txt';
-				
-				$page_url .= $page;
-			}
-			
-			else {
-				$page_file .= '.txt';
-			
-				$page_url .= $page.($this->rewrite ? '' : '.html');
-			}
-			
-		}
-			
-		// is it a 404?
-		if(!file_exists($page_file)) {
-			$debug = debug_backtrace();
-			
-			$this->log('error', sprintf($this->language->broken_link, $debug[0]['file'], $page, $debug[0]['line']));
-		}
-		
-		// cache this link to save further processing
-		$this->links[$page] = $page_url;
-		
-		return $page_url;
-	}
-	
 	/**
-	 * Include a file, tracking the current file name
+	 * Allow all properties to be retrieved, but not edited
 	 */
+	public function __get($var) {
+		return $this->$var;
+	}
 }

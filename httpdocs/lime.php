@@ -1,9 +1,9 @@
 <?php
 
-define('LIME_PATH', '../');
+//define('LIME_PATH', '../');
 
 // load the core class
-require_once LIME_PATH.'system/classes/core.php';
+require_once '../system/classes/core.php';
 
 $lime = new Lime\Core;
 
