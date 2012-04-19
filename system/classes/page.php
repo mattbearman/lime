@@ -190,6 +190,11 @@ class Page {
 			}
 		}
 		
+		// default to order by date descending
+		usort($this->siblings, function(&$a, $b) {
+			return $b->date - $a->date;
+		});
+		
 		return $this->siblings;
 	}
 	
@@ -298,7 +303,7 @@ class Page {
 	
 	public function __get($name) {
 		// allowed to get page details
-		$allowed = array('core', 'uri', 'content', 'title', 'file_name', 'html', 'template');
+		$allowed = array('core', 'uri', 'date', 'content', 'title', 'file_name', 'html', 'template');
 		
 		if(in_array($name, $allowed)) {
 			return $this->$name;
