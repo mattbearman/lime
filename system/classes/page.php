@@ -46,8 +46,9 @@ class Page {
 		// does the URI have a date specifed
 		$matches = array();
 		
+		// look for date in format YYYY-MM-DD YY-M-D will also work
 		if(preg_match('/^([0-9]{2,4}-[0-1]?[0-9]-[0-3]?[0-9])-(.+)/i', $this->file_name, $matches)) {
-			$this->date = $matches[1];
+			$this->date = strtotime($matches[1]);
 			
 			$this->title = $matches[2];
 		}
@@ -91,7 +92,7 @@ class Page {
 		$self = $this;
 		
 		// prepare for the ugliest regex evar! so many escapes...
-		return preg_replace_callback('/\[(.+?)\]\((\/.+?)\)/', function($matches) use (&$self) {
+		return preg_replace_callback('/\[(.+?)\]\((\/.*?)\)/', function($matches) use (&$self) {
 			// resolve internal link
 			return "[{$matches[1]}](".$self->url($matches[2], $self->uri.'.txt').')';
 		}, $markdown);
