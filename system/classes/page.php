@@ -71,8 +71,30 @@ class Page {
 		$file_path = $this->core->source_path.$this->uri.'.txt';
 		
 		if(file_exists($file_path)) {
-			$this->content = Markdown(file_get_contents($file_path));
+			$markdown_content = file_get_contents($file_path);
+			
+			// extract and process any links in the markdown
+			$markdown_content = $this->resolve_markdown_links($markdown_content);
+			
+			// complie markdown into HTML
+			$this->content = Markdown($markdown_content);
 		}
+	}
+	
+	/**
+	 * Extract and process links in markdown
+	 */
+	public function resolve_markdown_links($markdown) {
+		// find relative links, format [...](/...)
+		
+		// set refernce to this page object to be used in the context of the regex replace closure
+		$self = $this;
+		
+		// prepare for the ugliest regex evar! so many escapes...
+		return preg_replace_callback('/\[(.+?)\]\((\/.+?)\)/', function($matches) use (&$self) {
+			// resolve internal link
+			return "[{$matches[1]}](".$self->url($matches[2], $self->uri.'.txt').')';
+		}, $markdown);
 	}
 	
 	/**
@@ -205,16 +227,13 @@ class Page {
 		}
 	}
 	
-	public function __tostring() {
-		return $this->uri;
-	}
-	
 	/**
-	 * Get a link, if $page is not specified then use the current page
+	 * Get a link, if $page is not specified then use the current page, if from_markdown is set, than that will be used in 404 error messages instead of template name
 	 * 
 	 * @param string $page
+	 * @param string $from_markdown
 	 */
-	protected function url($page=false) {
+	public function url($page=false, $from_markdown=false) {
 		
 		if(!$page) {
 			$page = $this->uri;
@@ -258,9 +277,16 @@ class Page {
 			
 		// is it a 404?
 		if(!file_exists($page_file)) {
-			$debug = debug_backtrace();
 			
-			$this->core->log('error', sprintf($this->core->language->broken_link, $debug[0]['file'], $page, $debug[0]['line']));
+			if(!$from_markdown) {
+				$debug = debug_backtrace();
+				
+				$this->core->log('error', sprintf($this->core->language->broken_template_link, $debug[0]['file'], $page, $debug[0]['line']));
+			}
+			
+			else {
+				$this->core->log('error', sprintf($this->core->language->broken_content_link, $from_markdown, $page));
+			}
 		}
 		
 		// cache this link to save further processing
@@ -271,12 +297,16 @@ class Page {
 	
 	public function __get($name) {
 		// allowed to get page details
-		$allowed = array('content', 'title', 'file_name', 'html', 'template');
+		$allowed = array('core', 'uri', 'content', 'title', 'file_name', 'html', 'template');
 		
 		if(in_array($name, $allowed)) {
 			return $this->$name;
 		}
 		
 		return null;
+	}
+	
+	public function __tostring() {
+		return $this->uri;
 	}
 }
