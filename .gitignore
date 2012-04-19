@@ -1,6 +1,14 @@
 # Project Specific Files #
 ##########################
 
+# Don't include compiled html #
+###############################
+demo_site/webroot/*.html
+
+# Don't include custom site files #
+###################################
+site/
+
 # Aptana Files #
 ################
 .project

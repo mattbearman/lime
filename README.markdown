@@ -6,6 +6,7 @@ instead text files in markdown format are used. The entire website is complied i
 I built the LiME webpage complier in PHP for no other reason than it's the language I know best. In my mind LiME is more of an idea than a pice of software, and I'd love nothing more than to see it ported to other languages.
 
 ##Documentaion##
-I will be creating a full LiME website with full documentation, but until then if you'd like to use LiME I recommend cloning this repo and poking around the source code and demo site, that should give you enough information to get going.
+I will be creating a full LiME website with full documentation, but until then the source code and demo site should give you enough information to get going.
 
-
+##Installing##
+To use LiME simply clone this repository to your server, rename the demo_site/ directory to site/ and point your set your servers document root to site/webroot.
