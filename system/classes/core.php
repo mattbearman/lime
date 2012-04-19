@@ -8,6 +8,7 @@ namespace Lime;
 class Core {
 	
 	private $version = '0.2';
+	private $lime_webpage = 'https://github.com/mattbearman/lime';
 	
 	private $lime_path;
 	private $site_path;
